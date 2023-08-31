@@ -47,6 +47,10 @@ harness = false
 name = "fft"
 harness = false
 
+[[bench]]
+name = "msm"
+harness = false
+
 [dependencies]
 itertools = "0.10"
 backtrace = { version = "0.3", optional = true }

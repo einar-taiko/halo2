@@ -8,7 +8,7 @@ use group::{
     Curve, Group, GroupOpsOwned, ScalarMulOwned,
 };
 
-pub use halo2curves::{CurveAffine, CurveExt};
+pub use halo2curves::{CurveAffine, CurveExt, CurveJacExt};
 
 use crate::{
     fft::{
@@ -76,33 +76,36 @@ fn multiexp_serial<C: CurveAffine>(coeffs: &[C::Scalar], bases: &[C], acc: &mut 
             *acc = acc.double();
         }
 
-        #[derive(Clone, Copy)]
-        enum Bucket<C: CurveAffine> {
+        #[derive(Clone)]
+        enum Bucket<C: CurveJacExt> {
             None,
-            Affine(C),
-            Projective(C::Curve),
+            Affine(<<C as CurveAffine>::CurveExt as CurveExt>::AffineExt),
+            ExtJacobian(C::ExtendedJacobianCoordinates),
         }
 
-        impl<C: CurveAffine> Bucket<C> {
+        impl<C: CurveJacExt> Bucket<C> {
             fn add_assign(&mut self, other: &C) {
                 *self = match *self {
                     Bucket::None => Bucket::Affine(*other),
-                    Bucket::Affine(a) => Bucket::Projective(a + *other),
-                    Bucket::Projective(mut a) => {
+                    Bucket::Affine(a) => Bucket::ExtJacobian((a + *other).into()),
+                    Bucket::ExtJacobian(mut a) => {
                         a += *other;
-                        Bucket::Projective(a)
+                        Bucket::ExtJacobian(a)
                     }
                 }
             }
 
-            fn add(self, mut other: C::Curve) -> C::Curve {
+            fn add(
+                self,
+                mut other: C::Curve,
+            ) -> C::ExtendedJacobianCoordinates {
                 match self {
-                    Bucket::None => other,
+                    Bucket::None => other.into(),
                     Bucket::Affine(a) => {
                         other += a;
-                        other
+                        other.into()
                     }
-                    Bucket::Projective(a) => other + &a,
+                    Bucket::ExtJacobian(a) => a + other,
                 }
             }
         }
@@ -149,7 +152,7 @@ pub fn small_multiexp<C: CurveAffine>(coeffs: &[C::Scalar], bases: &[C]) -> C::C
         }
     }
 
-    acc
+    acc.to_affine().into()
 }
 
 /// Performs a multi-exponentiation operation.

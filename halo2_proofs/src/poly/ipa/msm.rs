@@ -4,6 +4,7 @@ use crate::poly::{
     commitment::{CommitmentScheme, Params, MSM},
     ipa::commitment::ParamsVerifierIPA,
 };
+use crate::ZalRef;
 use ff::Field;
 use group::Group;
 use halo2curves::zal::{H2cEngine, MsmAccel};
@@ -11,8 +12,12 @@ use std::collections::BTreeMap;
 
 /// A multiscalar multiplication in the polynomial commitment scheme
 #[derive(Debug, Clone)]
-pub struct MSMIPA<'params, C: CurveAffine> {
+pub struct MSMIPA<'params, 'zal, C: CurveAffine>
+where
+    'zal: 'params,
+{
     pub(crate) params: &'params ParamsVerifierIPA<C>,
+    pub zal: ZalRef<'zal>,
     g_scalars: Option<Vec<C::Scalar>>,
     w_scalar: Option<C::Scalar>,
     u_scalar: Option<C::Scalar>,
@@ -20,21 +25,21 @@ pub struct MSMIPA<'params, C: CurveAffine> {
     other: BTreeMap<C::Base, (C::Scalar, C::Base)>,
 }
 
-impl<'a, C: CurveAffine> MSMIPA<'a, C> {
+impl<'params, 'zal, C: CurveAffine> MSMIPA<'params, 'zal, C> {
     /// Given verifier parameters Creates an empty multi scalar engine
-    pub fn new(params: &'a ParamsVerifierIPA<C>) -> Self {
+    pub fn new(params: &'params ParamsVerifierIPA<C>, zal: ZalRef<'zal>) -> Self {
         let g_scalars = None;
         let w_scalar = None;
         let u_scalar = None;
         let other = BTreeMap::new();
 
         Self {
+            params,
+            zal,
             g_scalars,
             w_scalar,
             u_scalar,
             other,
-
-            params,
         }
     }
 
@@ -68,7 +73,7 @@ impl<'a, C: CurveAffine> MSMIPA<'a, C> {
     }
 }
 
-impl<'a, C: CurveAffine> MSM<C> for MSMIPA<'a, C> {
+impl<'params, 'zal, C: CurveAffine> MSM<C> for MSMIPA<'params, 'zal, C> {
     fn append_term(&mut self, scalar: C::Scalar, point: C::Curve) {
         if !bool::from(point.is_identity()) {
             use group::Curve;
@@ -187,7 +192,7 @@ impl<'a, C: CurveAffine> MSM<C> for MSMIPA<'a, C> {
     }
 }
 
-impl<'a, C: CurveAffine> MSMIPA<'a, C> {
+impl<'params, 'zal, C: CurveAffine> MSMIPA<'params, 'zal, C> {
     /// Add a value to the first entry of `g_scalars`.
     pub fn add_constant_term(&mut self, constant: C::Scalar) {
         if let Some(g_scalars) = self.g_scalars.as_mut() {
@@ -231,6 +236,7 @@ mod tests {
         ipa::msm::MSMIPA,
     };
     use group::Curve;
+    use halo2curves::zal::H2cEngine;
     use halo2curves::{
         pasta::{Ep, EpAffine, Fp, Fq},
         CurveAffine,
@@ -242,7 +248,8 @@ mod tests {
         let base_viol = base + base;
 
         let params = ParamsIPA::new(4);
-        let mut a: MSMIPA<EpAffine> = MSMIPA::new(&params);
+        let zal = H2cEngine::new();
+        let mut a: MSMIPA<EpAffine> = MSMIPA::new(&params, &zal);
         a.append_term(Fq::one(), base);
         // a = [1] P
         assert!(!a.clone().check());
@@ -268,7 +275,7 @@ mod tests {
         // a = [3*(1+1)+(1+1-4)] P + [3*(-1)+(-1+2)] 2P
         assert!(a.clone().check());
 
-        let mut c: MSMIPA<EpAffine> = MSMIPA::new(&params);
+        let mut c: MSMIPA<EpAffine> = MSMIPA::new(&params, &zal);
         c.append_term(Fq::from(2), base);
         c.append_term(Fq::one(), -base_viol);
         // c = [2] P + [1] (-2P)

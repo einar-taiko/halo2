@@ -5,6 +5,7 @@ use super::msm::MSMIPA;
 use super::multiopen::VerifierIPA;
 use crate::poly::commitment::CommitmentScheme;
 use crate::transcript::TranscriptRead;
+use crate::ZalRef;
 use crate::{
     plonk::Error,
     poly::{
@@ -15,14 +16,14 @@ use crate::{
 };
 use ff::Field;
 use group::Curve;
-use halo2curves::zal::{H2cEngine, MsmAccel};
+use halo2curves::zal::{self, H2cEngine, MsmAccel};
 use halo2curves::CurveAffine;
 use rand_core::{OsRng, RngCore};
 
 /// Wrapper for verification accumulator
 #[derive(Debug, Clone)]
-pub struct GuardIPA<'params, C: CurveAffine> {
-    pub(crate) msm: MSMIPA<'params, C>,
+pub struct GuardIPA<'params, 'zal, C: CurveAffine> {
+    pub(crate) msm: MSMIPA<'params, 'zal, C>,
     pub(crate) neg_c: C::Scalar,
     pub(crate) u: Vec<C::Scalar>,
     pub(crate) u_packed: Vec<C::Scalar>,
@@ -40,15 +41,15 @@ pub struct Accumulator<C: CurveAffine> {
 }
 
 /// Define accumulator type as `MSMIPA`
-impl<'params, C: CurveAffine> Guard<IPACommitmentScheme<C>> for GuardIPA<'params, C> {
-    type MSMAccumulator = MSMIPA<'params, C>;
+impl<'params, 'zal, C: CurveAffine> Guard<IPACommitmentScheme<C>> for GuardIPA<'params, 'zal, C> {
+    type MSMAccumulator = MSMIPA<'params, 'zal, C>;
 }
 
 /// IPA specific operations
-impl<'params, C: CurveAffine> GuardIPA<'params, C> {
+impl<'params, 'zal, C: CurveAffine> GuardIPA<'params, 'zal, C> {
     /// Lets caller supply the challenges and obtain an MSM with updated
     /// scalars and points.
-    pub fn use_challenges(mut self) -> MSMIPA<'params, C> {
+    pub fn use_challenges(mut self) -> MSMIPA<'params, 'zal, C> {
         let s = compute_s(&self.u, self.neg_c);
         self.msm.add_to_g_scalars(&s);
 
@@ -57,7 +58,7 @@ impl<'params, C: CurveAffine> GuardIPA<'params, C> {
 
     /// Lets caller supply the purported G point and simply appends
     /// [-c] G to return an updated MSM.
-    pub fn use_g(mut self, g: C) -> (MSMIPA<'params, C>, Accumulator<C>) {
+    pub fn use_g(mut self, g: C) -> (MSMIPA<'params, 'zal, C>, Accumulator<C>) {
         self.msm.append_term(self.neg_c, g.into());
 
         let accumulator = Accumulator {
@@ -79,25 +80,25 @@ impl<'params, C: CurveAffine> GuardIPA<'params, C> {
 
 /// A verifier that checks multiple proofs in a batch.
 #[derive(Debug)]
-pub struct AccumulatorStrategy<'params, C: CurveAffine> {
-    msm: MSMIPA<'params, C>,
+pub struct AccumulatorStrategy<'params, 'zal, C: CurveAffine> {
+    msm: MSMIPA<'params, 'zal, C>,
 }
 
 impl<'params, 'zal, C: CurveAffine>
     VerificationStrategy<'params, 'zal, IPACommitmentScheme<C>, VerifierIPA<'params, 'zal, C>>
-    for AccumulatorStrategy<'params, C>
+    for AccumulatorStrategy<'params, 'zal, C>
 {
     type Output = Self;
 
-    fn new(params: &'params ParamsIPA<C>) -> Self {
+    fn new(params: &'params ParamsIPA<C>, zal: ZalRef<'zal>) -> Self {
         AccumulatorStrategy {
-            msm: MSMIPA::new(params),
+            msm: MSMIPA::new(params, zal),
         }
     }
 
     fn process(
         mut self,
-        f: impl FnOnce(MSMIPA<'params, C>) -> Result<GuardIPA<'params, C>, Error>,
+        f: impl FnOnce(MSMIPA<'params, 'zal, C>) -> Result<GuardIPA<'params, 'zal, C>, Error>,
     ) -> Result<Self::Output, Error> {
         self.msm.scale(C::Scalar::random(OsRng));
         let guard = f(self.msm)?;
@@ -119,25 +120,25 @@ impl<'params, 'zal, C: CurveAffine>
 
 /// A verifier that checks single proof
 #[derive(Debug)]
-pub struct SingleStrategy<'params, C: CurveAffine> {
-    msm: MSMIPA<'params, C>,
+pub struct SingleStrategy<'params, 'zal, C: CurveAffine> {
+    msm: MSMIPA<'params, 'zal, C>,
 }
 
 impl<'params, 'zal, C: CurveAffine>
     VerificationStrategy<'params, 'zal, IPACommitmentScheme<C>, VerifierIPA<'params, 'zal, C>>
-    for SingleStrategy<'params, C>
+    for SingleStrategy<'params, 'zal, C>
 {
     type Output = ();
 
-    fn new(params: &'params ParamsIPA<C>) -> Self {
+    fn new(params: &'params ParamsIPA<C>, zal: ZalRef<'zal>) -> Self {
         SingleStrategy {
-            msm: MSMIPA::new(params),
+            msm: MSMIPA::new(params, zal),
         }
     }
 
     fn process(
         self,
-        f: impl FnOnce(MSMIPA<'params, C>) -> Result<GuardIPA<'params, C>, Error>,
+        f: impl FnOnce(MSMIPA<'params, 'zal, C>) -> Result<GuardIPA<'params, 'zal, C>, Error>,
     ) -> Result<Self::Output, Error> {
         let guard = f(self.msm)?;
         let msm = guard.use_challenges();

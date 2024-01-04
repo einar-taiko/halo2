@@ -28,25 +28,25 @@ use crate::{
 /// `BatchVerifier` handles the accumulation of the MSMs for the batched proofs.
 #[derive(Debug)]
 struct BatchStrategy<'params, 'zal, C: CurveAffine> {
-    msm: MSMIPA<'params, C>,
-    zal: ZalRef<'zal>,
+    msm: MSMIPA<'params, 'zal, C>,
+    //zal: ZalRef<'zal>,
 }
 
 impl<'params, 'zal, C: CurveAffine>
     VerificationStrategy<'params, 'zal, IPACommitmentScheme<C>, VerifierIPA<'params, 'zal, C>>
     for BatchStrategy<'params, 'zal, C>
 {
-    type Output = MSMIPA<'params, C>;
+    type Output = MSMIPA<'params, 'zal, C>;
 
-    fn new(params: &'params ParamsVerifierIPA<C>) -> Self {
+    fn new(params: &'params ParamsVerifierIPA<C>, zal: ZalRef<'zal>) -> Self {
         BatchStrategy {
-            msm: MSMIPA::new(params),
+            msm: MSMIPA::new(params, zal),
         }
     }
 
     fn process(
         self,
-        f: impl FnOnce(MSMIPA<'params, C>) -> Result<GuardIPA<'params, C>, Error>,
+        f: impl FnOnce(MSMIPA<'params, 'zal, C>) -> Result<GuardIPA<'params, 'zal, C>, Error>,
     ) -> Result<Self::Output, Error> {
         let guard = f(self.msm)?;
         Ok(guard.use_challenges())
@@ -92,11 +92,11 @@ where
     /// This uses [`OsRng`] internally instead of taking an `R: RngCore` argument, because
     /// the internal parallelization requires access to a RNG that is guaranteed to not
     /// clone its internal state when shared between threads.
-    pub fn finalize(self, params: &ParamsVerifierIPA<C>, vk: &VerifyingKey<C>) -> bool {
-        fn accumulate_msm<'params, C: CurveAffine>(
-            mut acc: MSMIPA<'params, C>,
-            msm: MSMIPA<'params, C>,
-        ) -> MSMIPA<'params, C> {
+    pub fn finalize<'zal>(self, params: &ParamsVerifierIPA<C>, zal: ZalRef<'zal>, vk: &VerifyingKey<C>) -> bool {
+        fn accumulate_msm<'params, 'zal, C: CurveAffine>(
+            mut acc: MSMIPA<'params, 'zal, C>,
+            msm: MSMIPA<'params, 'zal, C>,
+        ) -> MSMIPA<'params, 'zal, C> {
             // Scale the MSM by a random factor to ensure that if the existing MSM has
             // `is_zero() == false` then this argument won't be able to interfere with it
             // to make it true, with high probability.
@@ -108,7 +108,7 @@ where
 
         let final_msm = self
             .items
-            .into_par_iter()
+            .into_iter()
             .enumerate()
             .map(|(i, item)| {
                 let instances: Vec<Vec<_>> = item
@@ -118,18 +118,18 @@ where
                     .collect();
                 let instances: Vec<_> = instances.iter().map(|i| &i[..]).collect();
 
-                let strategy = BatchStrategy::new(params);
+                let strategy = BatchStrategy::new(params, zal);
                 let mut transcript = Blake2bRead::init(&item.proof[..]);
-                verify_proof(params, self.zal, vk, strategy, &instances, &mut transcript).map_err(|e| {
+                verify_proof(params, zal, vk, strategy, &instances, &mut transcript).map_err(|e| {
                     tracing::debug!("Batch item {} failed verification: {}", i, e);
                     e
                 })
             })
             .try_fold(
-                || params.empty_msm(self.zal),
+                || params.empty_msm(zal),
                 |msm, res| res.map(|proof_msm| accumulate_msm(msm, proof_msm)),
             )
-            .try_reduce(|| params.empty_msm(self.zal), |a, b| Ok(accumulate_msm(a, b)));
+            .try_reduce(|| params.empty_msm(zal), |a, b| Ok(accumulate_msm(a, b)));
 
         match final_msm {
             Ok(msm) => msm.check(),

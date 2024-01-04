@@ -16,13 +16,19 @@ use crate::{
 /// Checks to see if the proof represented within `transcript` is valid, and a
 /// point `x` that the polynomial commitment `P` opens purportedly to the value
 /// `v`. The provided `msm` should evaluate to the commitment `P` being opened.
-pub fn verify_proof<'params, C: CurveAffine, E: EncodedChallenge<C>, T: TranscriptRead<C, E>>(
+pub fn verify_proof<
+    'params,
+    'zal,
+    C: CurveAffine,
+    E: EncodedChallenge<C>,
+    T: TranscriptRead<C, E>,
+>(
     params: &'params ParamsIPA<C>,
-    mut msm: MSMIPA<'params, C>,
+    mut msm: MSMIPA<'params, 'zal, C>,
     transcript: &mut T,
     x: C::Scalar,
     v: C::Scalar,
-) -> Result<GuardIPA<'params, C>, Error> {
+) -> Result<GuardIPA<'params, 'zal, C>, Error> {
     let k = params.k as usize;
 
     // P' = P - [v] G_0 + [ξ] S

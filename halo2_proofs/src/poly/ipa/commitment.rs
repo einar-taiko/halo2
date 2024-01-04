@@ -3,6 +3,7 @@
 //!
 //! [halo]: https://eprint.iacr.org/2019/1021
 
+use crate::ZalRef;
 use crate::arithmetic::{best_fft, g_to_lagrange, parallelize, CurveAffine, CurveExt};
 use crate::helpers::CurveRead;
 use crate::poly::commitment::{Blind, CommitmentScheme, Params, ParamsProver, ParamsVerifier, MSM};
@@ -59,10 +60,16 @@ impl<C: CurveAffine> CommitmentScheme for IPACommitmentScheme<C> {
 /// Verifier parameters
 pub type ParamsVerifierIPA<C> = ParamsIPA<C>;
 
-impl<'params, 'zal, C: CurveAffine> ParamsVerifier<'params, 'zal, C> for ParamsIPA<C> {}
+impl<'params, 'zal, C: CurveAffine> ParamsVerifier<'params, 'zal, C> for ParamsIPA<C> where
+    'zal: 'params
+{
+}
 
-impl<'params, 'zal, C: CurveAffine> Params<'params, 'zal, C> for ParamsIPA<C> {
-    type MSM = MSMIPA<'params, C>;
+impl<'params, 'zal, C: CurveAffine> Params<'params, 'zal, C> for ParamsIPA<C>
+where
+    'zal: 'params,
+{
+    type MSM = MSMIPA<'params, 'zal, C>;
 
     fn k(&self) -> u32 {
         self.k
@@ -81,8 +88,8 @@ impl<'params, 'zal, C: CurveAffine> Params<'params, 'zal, C> for ParamsIPA<C> {
         self.g_lagrange = g_to_lagrange(self.g.iter().map(|g| g.to_curve()).collect(), k);
     }
 
-    fn empty_msm(&'params self) -> MSMIPA<C> {
-        MSMIPA::new(self)
+    fn empty_msm(&'params self, zal: ZalRef<'zal>) -> MSMIPA<C> {
+        MSMIPA::new(self, zal)
     }
 
     /// This commits to a polynomial using its evaluations over the $2^k$ size
@@ -146,7 +153,10 @@ impl<'params, 'zal, C: CurveAffine> Params<'params, 'zal, C> for ParamsIPA<C> {
     }
 }
 
-impl<'params, 'zal, C: CurveAffine> ParamsProver<'params, 'zal, C> for ParamsIPA<C> {
+impl<'params, 'zal, C: CurveAffine> ParamsProver<'params, 'zal, C> for ParamsIPA<C>
+where
+    'zal: 'params,
+{
     type ParamsVerifier = ParamsVerifierIPA<C>;
 
     fn verifier_params(&'params self) -> &'params Self::ParamsVerifier {
@@ -235,6 +245,7 @@ impl<'params, 'zal, C: CurveAffine> ParamsProver<'params, 'zal, C> for ParamsIPA
 #[cfg(test)]
 mod test {
 
+    use crate::ZalRef;
     use crate::arithmetic::{best_fft, parallelize, CurveAffine, CurveExt};
     use crate::helpers::CurveRead;
     use crate::poly::commitment::ParamsProver;
@@ -245,6 +256,7 @@ mod test {
 
     use ff::{Field, PrimeField};
     use group::{prime::PrimeCurveAffine, Curve, Group};
+    use halo2curves::zal::{H2cEngine, ZalEngine};
     use std::marker::PhantomData;
     use std::ops::{Add, AddAssign, Mul, MulAssign};
 
@@ -325,6 +337,8 @@ mod test {
         <ParamsIPA<_> as Params<_>>::write(&params, &mut params_buffer).unwrap();
         let params: ParamsIPA<EpAffine> = Params::read::<_>(&mut &params_buffer[..]).unwrap();
 
+        let zal = H2cEngine::new();
+
         let domain = EvaluationDomain::new(1, K);
 
         let mut px = domain.empty_coeff();
@@ -361,7 +375,7 @@ mod test {
         let v_prime = transcript.read_scalar().unwrap();
         assert_eq!(v, v_prime);
 
-        let mut commitment_msm = MSMIPA::new(&params);
+        let mut commitment_msm = MSMIPA::new(&params, &zal);
         commitment_msm.append_term(Fq::one(), p.into());
 
         let guard = verify_proof(&params, commitment_msm, &mut transcript, *x, v).unwrap();

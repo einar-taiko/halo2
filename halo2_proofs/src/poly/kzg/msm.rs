@@ -13,7 +13,7 @@ use halo2curves::{
 };
 
 /// A multiscalar multiplication in the polynomial commitment scheme
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct MSMKZG<'zal, E: Engine> {
     pub(crate) zal: ZalRef<'zal>,
     pub(crate) scalars: Vec<E::Scalar>,
@@ -89,12 +89,14 @@ impl<'zal, E: Engine + Debug> MSM<E::G1Affine> for MSMKZG<'zal,E> {
 #[derive(Debug, Clone)]
 pub(crate) struct PreMSM<'zal, E: Engine> {
     projectives_msms: Vec<MSMKZG<'zal, E>>,
+    zal: ZalRef<'zal>,
 }
 
 impl<'zal, E: Engine + Debug> PreMSM<'zal, E> {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(zal: ZalRef<'zal>) -> Self {
         PreMSM {
             projectives_msms: vec![],
+            zal,
         }
     }
 
@@ -119,6 +121,7 @@ impl<'zal, E: Engine + Debug> PreMSM<'zal, E> {
     }
 }
 
+/*
 impl<'params, 'zal, E: MultiMillerLoop + Debug> From<&'params ParamsKZG<E>>
     for DualMSM<'params, 'zal, E>
 {
@@ -126,6 +129,7 @@ impl<'params, 'zal, E: MultiMillerLoop + Debug> From<&'params ParamsKZG<E>>
         DualMSM::new(params, zal)
     }
 }
+*/
 
 /// Two channel MSM accumulator
 #[derive(Debug, Clone)]

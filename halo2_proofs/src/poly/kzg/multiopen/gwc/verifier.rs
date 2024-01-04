@@ -29,7 +29,7 @@ use rand_core::OsRng;
 /// Concrete KZG verifier with GWC variant
 pub struct VerifierGWC<'params, 'zal, E: Engine> {
     params: &'params ParamsKZG<E>,
-    zal: PhantomData<ZalRef<'zal>>,
+    zal: ZalRef<'zal>,
 }
 
 impl<'params, 'zal, E> Verifier<'params, 'zal, KZGCommitmentScheme<E>>
@@ -56,7 +56,7 @@ where
         I,
     >(
         &self,
-        zal: ZalRef<'zal>,
+        //zal: ZalRef<'zal>,
         transcript: &mut T,
         queries: I,
         mut msm_accumulator: DualMSM<'params, 'zal, E>,
@@ -75,11 +75,11 @@ where
 
         let u: ChallengeU<_> = transcript.squeeze_challenge_scalar();
 
-        let mut commitment_multi = MSMKZG::<E>::new(zal);
+        let mut commitment_multi = MSMKZG::<E>::new(self.zal);
         let mut eval_multi = E::Scalar::ZERO;
 
-        let mut witness = MSMKZG::<E>::new(zal);
-        let mut witness_with_aux = MSMKZG::<E>::new(zal);
+        let mut witness = MSMKZG::<E>::new(self.zal);
+        let mut witness_with_aux = MSMKZG::<E>::new(self.zal);
 
         for ((commitment_at_a_point, wi), power_of_u) in
             commitment_data.iter().zip(w.into_iter()).zip(powers(*u))
@@ -96,7 +96,7 @@ where
 
                     let commitment = match query.get_commitment() {
                         CommitmentReference::Commitment(c) => {
-                            let mut msm = MSMKZG::<E>::new(zal);
+                            let mut msm = MSMKZG::<E>::new(self.zal);
                             msm.append_term(power_of_v, (*c).into());
                             msm
                         }

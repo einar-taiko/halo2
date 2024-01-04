@@ -1,4 +1,5 @@
 use super::{
+    ipa::msm::MSMIPA,
     query::{ProverQuery, VerifierQuery},
     strategy::Guard,
     Coeff, LagrangeCoeff, Polynomial,
@@ -76,7 +77,10 @@ pub trait Params<'params, 'zal, C: CurveAffine>: Sized + Clone {
 }
 
 /// Parameters for circuit sysnthesis and prover parameters.
-pub trait ParamsProver<'params, 'zal, C: CurveAffine>: Params<'params, 'zal, C> {
+pub trait ParamsProver<'params, 'zal, C: CurveAffine>: Params<'params, 'zal, C>
+where
+    'zal: 'params,
+{
     /// Constant verifier parameters.
     type ParamsVerifier: ParamsVerifier<'params, 'zal, C>;
 
@@ -157,14 +161,14 @@ pub trait Verifier<'params, 'zal, Scheme: CommitmentScheme> {
     /// to allow developer to compress or combined verification results
     type Guard: Guard<Scheme, MSMAccumulator = Self::MSMAccumulator>;
 
-    /// Accumulator fot comressed verification
+    /// Accumulator for comressed verification
     type MSMAccumulator;
 
     /// Query instance or not
     const QUERY_INSTANCE: bool;
 
     /// Creates new verifier instance
-    fn new(params: &'params Scheme::ParamsVerifier) -> Self;
+    fn new(params: &'params Scheme::ParamsVerifier, zal: ZalRef<'zal>) -> Self;
 
     /// Process the proof and returns unfinished result named `Guard`
     fn verify_proof<
@@ -175,12 +179,15 @@ pub trait Verifier<'params, 'zal, Scheme: CommitmentScheme> {
         I,
     >(
         &self,
+        //zal: ZalRef<'zal>,
         transcript: &mut T,
         queries: I,
         msm: Self::MSMAccumulator,
     ) -> Result<Self::Guard, Error>
     where
         'params: 'com,
+        'zal: 'com,
+        //MSMIPA<'params, 'zal, C>: 'com,
         //'zal: 'com,
         I: IntoIterator<
                 Item = VerifierQuery<

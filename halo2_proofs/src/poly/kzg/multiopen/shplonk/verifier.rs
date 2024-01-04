@@ -33,7 +33,7 @@ use std::ops::MulAssign;
 #[derive(Debug)]
 pub struct VerifierSHPLONK<'params, 'zal, E: Engine> {
     params: &'params ParamsKZG<E>,
-    //zal: PhantomData<ZalRef<'zal>>,
+    zal: ZalRef<'zal>,
 }
 
 impl<'params, 'zal, E> Verifier<'params, 'zal, KZGCommitmentScheme<E>>
@@ -49,8 +49,8 @@ where
 
     const QUERY_INSTANCE: bool = false;
 
-    fn new(params: &'params ParamsKZG<E>) -> Self {
-        Self { params }
+    fn new(params: &'params ParamsKZG<E>, zal: ZalRef<'zal>) -> Self {
+        Self { params, zal }
     }
 
     /// Verify a multi-opening proof
@@ -62,7 +62,7 @@ where
         I,
     >(
         &self,
-        zal: ZalRef,
+        //zal: ZalRef<'zal>,
         transcript: &mut T,
         queries: I,
         mut msm_accumulator: DualMSM<'params, 'zal, E>,
@@ -85,7 +85,7 @@ where
         let h2 = transcript.read_point().map_err(|_| Error::SamplingError)?;
 
         let (mut z_0_diff_inverse, mut z_0) = (E::Scalar::ZERO, E::Scalar::ZERO);
-        let (mut outer_msm, mut r_outer_acc) = (PreMSM::<E>::new(), E::Scalar::ZERO);
+        let (mut outer_msm, mut r_outer_acc) = (PreMSM::<E>::new(self.zal), E::Scalar::ZERO);
         for (i, (rotation_set, power_of_v)) in rotation_sets.iter().zip(powers(*v)).enumerate() {
             let diffs: Vec<E::Scalar> = super_point_set
                 .iter()
@@ -116,7 +116,7 @@ where
                     let r_eval = power_of_y * eval_polynomial(&r_x[..], *u);
                     let msm = match commitment_data.get() {
                         CommitmentReference::Commitment(c) => {
-                            let mut msm = MSMKZG::<E>::new(zal);
+                            let mut msm = MSMKZG::<E>::new(self.zal);
                             msm.append_term(power_of_y, (*c).into());
                             msm
                         }

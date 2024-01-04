@@ -28,9 +28,11 @@ pub struct VerifierIPA<'params, 'zal, C: CurveAffine> {
 
 impl<'params, 'zal, C: CurveAffine> Verifier<'params, 'zal, IPACommitmentScheme<C>>
     for VerifierIPA<'params, 'zal, C>
+where
+    'zal: 'params,
 {
-    type Guard = GuardIPA<'params, C>;
-    type MSMAccumulator = MSMIPA<'params, C>;
+    type Guard = GuardIPA<'params, 'zal, C>;
+    type MSMAccumulator = MSMIPA<'params, 'zal, C>;
 
     const QUERY_INSTANCE: bool = true;
 
@@ -40,13 +42,15 @@ impl<'params, 'zal, C: CurveAffine> Verifier<'params, 'zal, IPACommitmentScheme<
 
     fn verify_proof<'com, E: EncodedChallenge<C>, T: TranscriptRead<C, E>, I>(
         &self,
+        //zal: ZalRef<'zal>,
         transcript: &mut T,
         queries: I,
-        mut msm: MSMIPA<'params, C>,
+        mut msm: MSMIPA<'params, 'zal, C>,
     ) -> Result<Self::Guard, Error>
     where
         'params: 'com,
-        I: IntoIterator<Item = VerifierQuery<'com, C, MSMIPA<'params, C>>> + Clone,
+        MSMIPA<'params, 'zal, C>: 'com,
+        I: IntoIterator<Item = VerifierQuery<'com, C, MSMIPA<'params, 'zal, C>>> + Clone,
     {
         // Sample x_1 for compressing openings at the same point sets together
         let x_1: ChallengeX1<_> = transcript.squeeze_challenge_scalar();
@@ -68,9 +72,10 @@ impl<'params, 'zal, C: CurveAffine> Verifier<'params, 'zal, IPACommitmentScheme<
             q_eval_sets.push(vec![C::Scalar::ZERO; point_set.len()]);
         }
         {
-            let mut accumulate = |set_idx: usize,
-                                  new_commitment: CommitmentReference<C, MSMIPA<'params, C>>,
-                                  evals: Vec<C::Scalar>| {
+            let mut accumulate =
+                |set_idx: usize,
+                 new_commitment: CommitmentReference<C, MSMIPA<'params, 'zal, C>>,
+                 evals: Vec<C::Scalar>| {
                 q_commitments[set_idx].scale(*x_1);
                 match new_commitment {
                     CommitmentReference::Commitment(c) => {

@@ -5,6 +5,7 @@ use super::commitment::{CommitmentScheme, Verifier, MSM};
 use crate::{
     plonk::Error,
     transcript::{EncodedChallenge, TranscriptRead},
+    ZalRef,
 };
 
 /// Guards is unfinished verification result. Implement this to construct various
@@ -15,12 +16,18 @@ pub trait Guard<Scheme: CommitmentScheme> {
 }
 
 /// Trait representing a strategy for verifying Halo 2 proofs.
-pub trait VerificationStrategy<'params, 'zal, Scheme: CommitmentScheme, V: Verifier<'params, 'zal, Scheme>> {
+pub trait VerificationStrategy<
+    'params,
+    'zal,
+    Scheme: CommitmentScheme,
+    V: Verifier<'params, 'zal, Scheme>,
+>
+{
     /// The output type of this verification strategy after processing a proof.
     type Output;
 
     /// Creates new verification strategy instance
-    fn new(params: &'params Scheme::ParamsVerifier) -> Self;
+    fn new(params: &'params Scheme::ParamsVerifier, zal: ZalRef<'zal>) -> Self;
 
     /// Obtains an MSM from the verifier strategy and yields back the strategy's
     /// output.

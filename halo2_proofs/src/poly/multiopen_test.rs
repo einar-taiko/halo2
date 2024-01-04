@@ -17,8 +17,10 @@ mod test {
         Keccak256Write, TranscriptRead, TranscriptReadBuffer, TranscriptWrite,
         TranscriptWriterBuffer,
     };
+    use crate::ZalRef;
     use ff::{Field, PrimeField, WithSmallOrderMulGroup};
     use group::{Curve, Group};
+    use halo2curves::zal::H2cEngine;
     use halo2curves::CurveAffine;
     use rand_core::{OsRng, RngCore};
     use std::io::{Read, Write};
@@ -33,6 +35,7 @@ mod test {
         const K: u32 = 4;
 
         let params = ParamsIPA::<EqAffine>::new(K);
+        let zal = H2cEngine::new();
 
         let proof = create_proof::<
             IPACommitmentScheme<EqAffine>,
@@ -49,7 +52,7 @@ mod test {
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], false);
+        >(verifier_params, &zal,&proof[..], false);
 
         verify::<
             IPACommitmentScheme<EqAffine>,
@@ -57,7 +60,7 @@ mod test {
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], true);
+        >(verifier_params, &zal, &proof[..], true);
     }
 
     #[test]
@@ -79,6 +82,7 @@ mod test {
         >(&params);
 
         let verifier_params = params.verifier_params();
+        let zal = H2cEngine::new();
 
         verify::<
             IPACommitmentScheme<EqAffine>,
@@ -86,7 +90,7 @@ mod test {
             _,
             Keccak256Read<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], false);
+        >(verifier_params, &zal, &proof[..], false);
 
         verify::<
             IPACommitmentScheme<EqAffine>,
@@ -94,7 +98,7 @@ mod test {
             _,
             Keccak256Read<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], true);
+        >(verifier_params, &zal,&proof[..], true);
     }
 
     #[test]
@@ -113,9 +117,11 @@ mod test {
             create_proof::<_, ProverGWC<_>, _, Blake2bWrite<_, _, Challenge255<_>>>(&params);
 
         let verifier_params = params.verifier_params();
+        let zal = H2cEngine::new();
 
         verify::<_, VerifierGWC<_>, _, Blake2bRead<_, _, Challenge255<_>>, AccumulatorStrategy<_>>(
             verifier_params,
+            &zal,
             &proof[..],
             false,
         );
@@ -126,7 +132,7 @@ mod test {
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], true);
+        >(verifier_params, &zal, &proof[..], true);
     }
 
     #[test]
@@ -149,6 +155,7 @@ mod test {
         >(&params);
 
         let verifier_params = params.verifier_params();
+        let zal = H2cEngine::new();
 
         verify::<
             KZGCommitmentScheme<Bn256>,
@@ -156,7 +163,7 @@ mod test {
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], false);
+        >(verifier_params, &zal,&proof[..], false);
 
         verify::<
             KZGCommitmentScheme<Bn256>,
@@ -164,7 +171,7 @@ mod test {
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], true);
+        >(verifier_params, &zal,&proof[..], true);
     }
 
     fn verify<
@@ -178,10 +185,11 @@ mod test {
         Strategy: VerificationStrategy<'params, 'zal, Scheme, V, Output = Strategy>,
     >(
         params: &'params Scheme::ParamsVerifier,
+        zal: ZalRef<'zal>,
         proof: &'a [u8],
         should_fail: bool,
     ) {
-        let verifier = V::new(params);
+        let verifier = V::new(params, zal);
 
         let mut transcript = T::init(proof);
 
@@ -213,7 +221,7 @@ mod test {
         };
 
         {
-            let strategy = Strategy::new(params);
+            let strategy = Strategy::new(params, zal);
             let strategy = strategy
                 .process(|msm_accumulator| {
                     verifier

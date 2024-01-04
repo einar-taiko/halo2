@@ -278,6 +278,7 @@ pub type ParamsVerifierKZG<C> = ParamsKZG<C>;
 
 impl<'params, 'zal, E: Engine + Debug> Params<'params, 'zal, E::G1Affine> for ParamsKZG<E>
 where
+    'zal: 'params,
     E::Scalar: PrimeField,
     E::G1Affine: SerdeCurveAffine,
     E::G2Affine: SerdeCurveAffine,
@@ -333,6 +334,7 @@ where
 
 impl<'params, 'zal, E: Engine + Debug> ParamsVerifier<'params, 'zal, E::G1Affine> for ParamsKZG<E>
 where
+    'zal: 'params,
     E::Scalar: PrimeField,
     E::G1Affine: SerdeCurveAffine,
     E::G2Affine: SerdeCurveAffine,
@@ -341,6 +343,7 @@ where
 
 impl<'params, 'zal, E: Engine + Debug> ParamsProver<'params, 'zal, E::G1Affine> for ParamsKZG<E>
 where
+    'zal: 'params,
     E::Scalar: PrimeField,
     E::G1Affine: SerdeCurveAffine,
     E::G2Affine: SerdeCurveAffine,

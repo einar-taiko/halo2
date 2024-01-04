@@ -46,7 +46,7 @@ where
     const QUERY_INSTANCE: bool = false;
 
     fn new(params: &'params ParamsKZG<E>, zal: ZalRef) -> Self {
-        Self { params }
+        Self { params, zal }
     }
 
     fn verify_proof<

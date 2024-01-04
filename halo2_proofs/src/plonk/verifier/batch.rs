@@ -20,19 +20,21 @@ use crate::{
         },
     },
     transcript::{Blake2bRead, TranscriptReadBuffer},
+    ZalRef,
 };
 
 /// A proof verification strategy that returns the proof's MSM.
 ///
 /// `BatchVerifier` handles the accumulation of the MSMs for the batched proofs.
 #[derive(Debug)]
-struct BatchStrategy<'params, C: CurveAffine> {
+struct BatchStrategy<'params, 'zal, C: CurveAffine> {
     msm: MSMIPA<'params, C>,
+    zal: ZalRef<'zal>,
 }
 
 impl<'params, 'zal, C: CurveAffine>
     VerificationStrategy<'params, 'zal, IPACommitmentScheme<C>, VerifierIPA<'params, 'zal, C>>
-    for BatchStrategy<'params, C>
+    for BatchStrategy<'params, 'zal, C>
 {
     type Output = MSMIPA<'params, C>;
 
@@ -118,7 +120,7 @@ where
 
                 let strategy = BatchStrategy::new(params);
                 let mut transcript = Blake2bRead::init(&item.proof[..]);
-                verify_proof(params, zal, vk, strategy, &instances, &mut transcript).map_err(|e| {
+                verify_proof(params, self.zal, vk, strategy, &instances, &mut transcript).map_err(|e| {
                     tracing::debug!("Batch item {} failed verification: {}", i, e);
                     e
                 })

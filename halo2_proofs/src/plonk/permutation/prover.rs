@@ -44,8 +44,9 @@ pub(crate) struct Evaluated<C: CurveAffine> {
 impl Argument {
     pub(in crate::plonk) fn commit<
         'params,
+        'zal,
         C: CurveAffine,
-        P: Params<'params, C>,
+        P: Params<'params, 'zal, C>,
         E: EncodedChallenge<C>,
         R: RngCore,
         T: TranscriptWrite<C, E>,

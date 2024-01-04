@@ -121,7 +121,7 @@ impl<'r, C: CurveAffine, M: MSM<C>> PartialEq for CommitmentReference<'r, C, M> 
     }
 }
 
-impl<'com, C: CurveAffine, M: MSM<C>> Query<C::Scalar> for VerifierQuery<'com, C, M> {
+impl<'com, C: CurveAffine, M: MSM<C> + std::marker::Sync> Query<C::Scalar> for VerifierQuery<'com, C, M> {
     type Eval = C::Scalar;
     type Commitment = CommitmentReference<'com, C, M>;
 

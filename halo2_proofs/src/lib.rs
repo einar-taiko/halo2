@@ -37,3 +37,6 @@ pub mod transcript;
 pub mod dev;
 mod helpers;
 pub use helpers::SerdeFormat;
+
+/// Convenience type to be moved to `halo2curves`.
+pub type ZalRef<'zal> = &'zal dyn halo2curves::zal::ZalEngine;

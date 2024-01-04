@@ -3,8 +3,8 @@ use super::{
     strategy::Guard,
     Coeff, LagrangeCoeff, Polynomial,
 };
-use crate::poly::Error;
 use crate::transcript::{EncodedChallenge, TranscriptRead, TranscriptWrite};
+use crate::{poly::Error, ZalRef};
 use ff::Field;
 use group::{Curve, Group};
 use halo2curves::{CurveAffine, CurveExt};
@@ -24,14 +24,15 @@ pub trait CommitmentScheme {
     type Curve: CurveAffine<ScalarExt = Self::Scalar>;
 
     /// Constant prover parameters
-    type ParamsProver: for<'params> ParamsProver<
+    type ParamsProver: for<'params, 'zal> ParamsProver<
         'params,
+        'zal,
         Self::Curve,
         ParamsVerifier = Self::ParamsVerifier,
     >;
 
     /// Constant verifier parameters
-    type ParamsVerifier: for<'params> ParamsVerifier<'params, Self::Curve>;
+    type ParamsVerifier: for<'params, 'zal> ParamsVerifier<'params, 'zal, Self::Curve>;
 
     /// Wrapper for parameter generator
     fn new_params(k: u32) -> Self::ParamsProver;
@@ -41,9 +42,9 @@ pub trait CommitmentScheme {
 }
 
 /// Parameters for circuit sysnthesis and prover parameters.
-pub trait Params<'params, C: CurveAffine>: Sized + Clone {
+pub trait Params<'params, 'zal, C: CurveAffine>: Sized + Clone {
     /// Multi scalar multiplication engine
-    type MSM: MSM<C> + 'params;
+    type MSM: MSM<C> + 'params; //+ 'zal where Self: 'params;
 
     /// Logaritmic size of the circuit
     fn k(&self) -> u32;
@@ -56,7 +57,7 @@ pub trait Params<'params, C: CurveAffine>: Sized + Clone {
 
     /// Generates an empty multiscalar multiplication struct using the
     /// appropriate params.
-    fn empty_msm(&'params self) -> Self::MSM;
+    fn empty_msm(&'params self, zal: ZalRef<'zal>) -> Self::MSM;
 
     /// This commits to a polynomial using its evaluations over the $2^k$ size
     /// evaluation domain. The commitment will be blinded by the blinding factor
@@ -75,9 +76,9 @@ pub trait Params<'params, C: CurveAffine>: Sized + Clone {
 }
 
 /// Parameters for circuit sysnthesis and prover parameters.
-pub trait ParamsProver<'params, C: CurveAffine>: Params<'params, C> {
+pub trait ParamsProver<'params, 'zal, C: CurveAffine>: Params<'params, 'zal, C> {
     /// Constant verifier parameters.
-    type ParamsVerifier: ParamsVerifier<'params, C>;
+    type ParamsVerifier: ParamsVerifier<'params, 'zal, C>;
 
     /// Returns new instance of parameters
     fn new(k: u32) -> Self;
@@ -96,10 +97,10 @@ pub trait ParamsProver<'params, C: CurveAffine>: Params<'params, C> {
 }
 
 /// Verifier specific functionality with circuit constaints
-pub trait ParamsVerifier<'params, C: CurveAffine>: Params<'params, C> {}
+pub trait ParamsVerifier<'params, 'zal, C: CurveAffine>: Params<'params, 'zal, C> {}
 
 /// Multi scalar multiplication engine
-pub trait MSM<C: CurveAffine>: Clone + Debug + Send + Sync {
+pub trait MSM<C: CurveAffine>: Clone + Debug  {
     /// Add arbitrary term (the scalar and the point)
     fn append_term(&mut self, scalar: C::Scalar, point: C::CurveExt);
 
@@ -151,7 +152,7 @@ pub trait Prover<'params, Scheme: CommitmentScheme> {
 }
 
 /// Common multi-open verifier interface for various commitment schemes
-pub trait Verifier<'params, Scheme: CommitmentScheme> {
+pub trait Verifier<'params, 'zal, Scheme: CommitmentScheme> {
     /// Unfinalized verification result. This is returned in verification
     /// to allow developer to compress or combined verification results
     type Guard: Guard<Scheme, MSMAccumulator = Self::MSMAccumulator>;
@@ -168,6 +169,7 @@ pub trait Verifier<'params, Scheme: CommitmentScheme> {
     /// Process the proof and returns unfinished result named `Guard`
     fn verify_proof<
         'com,
+        //'zal: 'com,
         E: EncodedChallenge<Scheme::Curve>,
         T: TranscriptRead<Scheme::Curve, E>,
         I,
@@ -179,11 +181,12 @@ pub trait Verifier<'params, Scheme: CommitmentScheme> {
     ) -> Result<Self::Guard, Error>
     where
         'params: 'com,
+        //'zal: 'com,
         I: IntoIterator<
                 Item = VerifierQuery<
                     'com,
                     Scheme::Curve,
-                    <Scheme::ParamsVerifier as Params<'params, Scheme::Curve>>::MSM,
+                    <Scheme::ParamsVerifier as Params<'params, 'zal, Scheme::Curve>>::MSM,
                 >,
             > + Clone;
 }

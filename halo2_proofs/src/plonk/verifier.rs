@@ -15,6 +15,7 @@ use crate::poly::{
     Guard, VerifierQuery,
 };
 use crate::transcript::{read_n_points, read_n_scalars, EncodedChallenge, TranscriptRead};
+use crate::ZalRef;
 
 #[cfg(feature = "batch")]
 mod batch;
@@ -26,13 +27,15 @@ use crate::poly::commitment::ParamsVerifier;
 /// Returns a boolean indicating whether or not the proof is valid
 pub fn verify_proof<
     'params,
+    'zal,
     Scheme: CommitmentScheme,
-    V: Verifier<'params, Scheme>,
+    V: Verifier<'params, 'zal, Scheme>,
     E: EncodedChallenge<Scheme::Curve>,
     T: TranscriptRead<Scheme::Curve, E>,
-    Strategy: VerificationStrategy<'params, Scheme, V>,
+    Strategy: VerificationStrategy<'params, 'zal, Scheme, V>,
 >(
     params: &'params Scheme::ParamsVerifier,
+    zal: ZalRef,
     vk: &VerifyingKey<Scheme::Curve>,
     strategy: Strategy,
     instances: &[&[&[Scheme::Scalar]]],
@@ -323,7 +326,7 @@ where
                     )
             });
 
-        vanishing.verify(params, expressions, y, xn)
+        vanishing.verify(params, zal, expressions, y, xn)
     };
 
     let queries = instance_commitments

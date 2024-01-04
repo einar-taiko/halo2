@@ -30,8 +30,8 @@ struct BatchStrategy<'params, C: CurveAffine> {
     msm: MSMIPA<'params, C>,
 }
 
-impl<'params, C: CurveAffine>
-    VerificationStrategy<'params, IPACommitmentScheme<C>, VerifierIPA<'params, C>>
+impl<'params, 'zal, C: CurveAffine>
+    VerificationStrategy<'params, 'zal, IPACommitmentScheme<C>, VerifierIPA<'params, 'zal, C>>
     for BatchStrategy<'params, C>
 {
     type Output = MSMIPA<'params, C>;
@@ -118,16 +118,16 @@ where
 
                 let strategy = BatchStrategy::new(params);
                 let mut transcript = Blake2bRead::init(&item.proof[..]);
-                verify_proof(params, vk, strategy, &instances, &mut transcript).map_err(|e| {
+                verify_proof(params, zal, vk, strategy, &instances, &mut transcript).map_err(|e| {
                     tracing::debug!("Batch item {} failed verification: {}", i, e);
                     e
                 })
             })
             .try_fold(
-                || params.empty_msm(),
+                || params.empty_msm(self.zal),
                 |msm, res| res.map(|proof_msm| accumulate_msm(msm, proof_msm)),
             )
-            .try_reduce(|| params.empty_msm(), |a, b| Ok(accumulate_msm(a, b)));
+            .try_reduce(|| params.empty_msm(self.zal), |a, b| Ok(accumulate_msm(a, b)));
 
         match final_msm {
             Ok(msm) => msm.check(),

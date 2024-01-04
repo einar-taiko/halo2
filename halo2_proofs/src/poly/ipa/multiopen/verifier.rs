@@ -17,23 +17,25 @@ use crate::poly::query::{CommitmentReference, VerifierQuery};
 use crate::poly::strategy::VerificationStrategy;
 use crate::poly::Error;
 use crate::transcript::{EncodedChallenge, TranscriptRead};
+use crate::ZalRef;
 
 /// IPA multi-open verifier
 #[derive(Debug)]
-pub struct VerifierIPA<'params, C: CurveAffine> {
+pub struct VerifierIPA<'params, 'zal, C: CurveAffine> {
     params: &'params ParamsIPA<C>,
+    zal: ZalRef<'zal>,
 }
 
-impl<'params, C: CurveAffine> Verifier<'params, IPACommitmentScheme<C>>
-    for VerifierIPA<'params, C>
+impl<'params, 'zal, C: CurveAffine> Verifier<'params, 'zal, IPACommitmentScheme<C>>
+    for VerifierIPA<'params, 'zal, C>
 {
     type Guard = GuardIPA<'params, C>;
     type MSMAccumulator = MSMIPA<'params, C>;
 
     const QUERY_INSTANCE: bool = true;
 
-    fn new(params: &'params ParamsVerifierIPA<C>) -> Self {
-        Self { params }
+    fn new(params: &'params ParamsVerifierIPA<C>, zal: ZalRef<'zal>) -> Self {
+        Self { params, zal }
     }
 
     fn verify_proof<'com, E: EncodedChallenge<C>, T: TranscriptRead<C, E>, I>(
@@ -57,7 +59,7 @@ impl<'params, C: CurveAffine> Verifier<'params, IPACommitmentScheme<C>>
 
         // Compress the commitments and expected evaluations at x together.
         // using the challenge x_1
-        let mut q_commitments: Vec<_> = vec![self.params.empty_msm(); point_sets.len()];
+        let mut q_commitments: Vec<_> = vec![self.params.empty_msm(self.zal); point_sets.len()];
 
         // A vec of vecs of evals. The outer vec corresponds to the point set,
         // while the inner vec corresponds to the points in a particular set.

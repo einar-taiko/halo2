@@ -59,9 +59,9 @@ impl<C: CurveAffine> CommitmentScheme for IPACommitmentScheme<C> {
 /// Verifier parameters
 pub type ParamsVerifierIPA<C> = ParamsIPA<C>;
 
-impl<'params, C: CurveAffine> ParamsVerifier<'params, C> for ParamsIPA<C> {}
+impl<'params, 'zal, C: CurveAffine> ParamsVerifier<'params, 'zal, C> for ParamsIPA<C> {}
 
-impl<'params, C: CurveAffine> Params<'params, C> for ParamsIPA<C> {
+impl<'params, 'zal, C: CurveAffine> Params<'params, 'zal, C> for ParamsIPA<C> {
     type MSM = MSMIPA<'params, C>;
 
     fn k(&self) -> u32 {
@@ -146,7 +146,7 @@ impl<'params, C: CurveAffine> Params<'params, C> for ParamsIPA<C> {
     }
 }
 
-impl<'params, C: CurveAffine> ParamsProver<'params, C> for ParamsIPA<C> {
+impl<'params, 'zal, C: CurveAffine> ParamsProver<'params, 'zal, C> for ParamsIPA<C> {
     type ParamsVerifier = ParamsVerifierIPA<C>;
 
     fn verifier_params(&'params self) -> &'params Self::ParamsVerifier {

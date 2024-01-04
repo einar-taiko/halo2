@@ -170,11 +170,12 @@ mod test {
     fn verify<
         'a,
         'params,
+        'zal,
         Scheme: CommitmentScheme,
-        V: Verifier<'params, Scheme>,
+        V: Verifier<'params, 'zal, Scheme>,
         E: EncodedChallenge<Scheme::Curve>,
         T: TranscriptReadBuffer<&'a [u8], Scheme::Curve, E>,
-        Strategy: VerificationStrategy<'params, Scheme, V, Output = Strategy>,
+        Strategy: VerificationStrategy<'params, 'zal, Scheme, V, Output = Strategy>,
     >(
         params: &'params Scheme::ParamsVerifier,
         proof: &'a [u8],

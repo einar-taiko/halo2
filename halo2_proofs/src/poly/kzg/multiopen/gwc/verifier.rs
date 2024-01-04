@@ -18,6 +18,7 @@ use crate::poly::{
     Error,
 };
 use crate::transcript::{EncodedChallenge, TranscriptRead};
+use crate::ZalRef;
 
 use ff::{Field, PrimeField};
 use group::Group;
@@ -26,23 +27,25 @@ use rand_core::OsRng;
 
 #[derive(Debug)]
 /// Concrete KZG verifier with GWC variant
-pub struct VerifierGWC<'params, E: Engine> {
+pub struct VerifierGWC<'params, 'zal, E: Engine> {
     params: &'params ParamsKZG<E>,
+    zal: PhantomData<ZalRef<'zal>>,
 }
 
-impl<'params, E> Verifier<'params, KZGCommitmentScheme<E>> for VerifierGWC<'params, E>
+impl<'params, 'zal, E> Verifier<'params, 'zal, KZGCommitmentScheme<E>>
+    for VerifierGWC<'params, 'zal, E>
 where
     E: MultiMillerLoop + Debug,
     E::Scalar: PrimeField,
     E::G1Affine: SerdeCurveAffine,
     E::G2Affine: SerdeCurveAffine,
 {
-    type Guard = GuardKZG<'params, E>;
-    type MSMAccumulator = DualMSM<'params, E>;
+    type Guard = GuardKZG<'params, 'zal, E>;
+    type MSMAccumulator = DualMSM<'params, 'zal, E>;
 
     const QUERY_INSTANCE: bool = false;
 
-    fn new(params: &'params ParamsKZG<E>) -> Self {
+    fn new(params: &'params ParamsKZG<E>, zal: ZalRef) -> Self {
         Self { params }
     }
 
@@ -53,12 +56,14 @@ where
         I,
     >(
         &self,
+        zal: ZalRef<'zal>,
         transcript: &mut T,
         queries: I,
-        mut msm_accumulator: DualMSM<'params, E>,
+        mut msm_accumulator: DualMSM<'params, 'zal, E>,
     ) -> Result<Self::Guard, Error>
     where
-        I: IntoIterator<Item = VerifierQuery<'com, E::G1Affine, MSMKZG<E>>> + Clone,
+        'zal: 'com,
+        I: IntoIterator<Item = VerifierQuery<'com, E::G1Affine, MSMKZG<'zal, E>>> + Clone,
     {
         let v: ChallengeV<_> = transcript.squeeze_challenge_scalar();
 
@@ -70,11 +75,11 @@ where
 
         let u: ChallengeU<_> = transcript.squeeze_challenge_scalar();
 
-        let mut commitment_multi = MSMKZG::<E>::new();
+        let mut commitment_multi = MSMKZG::<E>::new(zal);
         let mut eval_multi = E::Scalar::ZERO;
 
-        let mut witness = MSMKZG::<E>::new();
-        let mut witness_with_aux = MSMKZG::<E>::new();
+        let mut witness = MSMKZG::<E>::new(zal);
+        let mut witness_with_aux = MSMKZG::<E>::new(zal);
 
         for ((commitment_at_a_point, wi), power_of_u) in
             commitment_data.iter().zip(w.into_iter()).zip(powers(*u))
@@ -91,7 +96,7 @@ where
 
                     let commitment = match query.get_commitment() {
                         CommitmentReference::Commitment(c) => {
-                            let mut msm = MSMKZG::<E>::new();
+                            let mut msm = MSMKZG::<E>::new(zal);
                             msm.append_term(power_of_v, (*c).into());
                             msm
                         }

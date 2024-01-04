@@ -2,7 +2,7 @@ use crate::arithmetic::{best_fft, g_to_lagrange, parallelize, CurveAffine, Curve
 use crate::helpers::SerdeCurveAffine;
 use crate::poly::commitment::{Blind, CommitmentScheme, Params, ParamsProver, ParamsVerifier, MSM};
 use crate::poly::{Coeff, LagrangeCoeff, Polynomial};
-use crate::SerdeFormat;
+use crate::{SerdeFormat, ZalRef};
 
 use ff::{Field, PrimeField};
 use group::{prime::PrimeCurveAffine, Curve, Group};
@@ -276,13 +276,13 @@ where
 /// KZG multi-open verification parameters
 pub type ParamsVerifierKZG<C> = ParamsKZG<C>;
 
-impl<'params, E: Engine + Debug> Params<'params, E::G1Affine> for ParamsKZG<E>
+impl<'params, 'zal, E: Engine + Debug> Params<'params, 'zal, E::G1Affine> for ParamsKZG<E>
 where
     E::Scalar: PrimeField,
     E::G1Affine: SerdeCurveAffine,
     E::G2Affine: SerdeCurveAffine,
 {
-    type MSM = MSMKZG<E>;
+    type MSM = MSMKZG<'zal, E>;
 
     fn k(&self) -> u32 {
         self.k
@@ -302,8 +302,8 @@ where
         self.g_lagrange = g_to_lagrange(self.g.iter().map(|g| g.to_curve()).collect(), k);
     }
 
-    fn empty_msm(&'params self) -> MSMKZG<E> {
-        MSMKZG::new()
+    fn empty_msm(&'params self, zal: ZalRef<'zal>) -> MSMKZG<'zal, E> {
+        MSMKZG::new(zal)
     }
 
     fn commit_lagrange(
@@ -331,7 +331,7 @@ where
     }
 }
 
-impl<'params, E: Engine + Debug> ParamsVerifier<'params, E::G1Affine> for ParamsKZG<E>
+impl<'params, 'zal, E: Engine + Debug> ParamsVerifier<'params, 'zal, E::G1Affine> for ParamsKZG<E>
 where
     E::Scalar: PrimeField,
     E::G1Affine: SerdeCurveAffine,
@@ -339,7 +339,7 @@ where
 {
 }
 
-impl<'params, E: Engine + Debug> ParamsProver<'params, E::G1Affine> for ParamsKZG<E>
+impl<'params, 'zal, E: Engine + Debug> ParamsProver<'params, 'zal, E::G1Affine> for ParamsKZG<E>
 where
     E::Scalar: PrimeField,
     E::G1Affine: SerdeCurveAffine,

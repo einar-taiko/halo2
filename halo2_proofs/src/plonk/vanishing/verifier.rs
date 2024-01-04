@@ -10,6 +10,7 @@ use crate::{
         VerifierQuery,
     },
     transcript::{read_n_points, EncodedChallenge, TranscriptRead},
+    ZalRef,
 };
 
 use super::super::{ChallengeX, ChallengeY};
@@ -87,9 +88,10 @@ impl<C: CurveAffine> Constructed<C> {
 }
 
 impl<C: CurveAffine> PartiallyEvaluated<C> {
-    pub(in crate::plonk) fn verify<'params, P: Params<'params, C>>(
+    pub(in crate::plonk) fn verify<'params, 'zal, P: Params<'params, 'zal, C>>(
         self,
         params: &'params P,
+        zal: ZalRef<'zal>,
         expressions: impl Iterator<Item = C::Scalar>,
         y: ChallengeY<C>,
         xn: C::Scalar,
@@ -101,7 +103,7 @@ impl<C: CurveAffine> PartiallyEvaluated<C> {
             self.h_commitments
                 .iter()
                 .rev()
-                .fold(params.empty_msm(), |mut acc, commitment| {
+                .fold(params.empty_msm(zal), |mut acc, commitment| {
                     acc.scale(xn);
                     let commitment: C::CurveExt = (*commitment).into();
                     acc.append_term(C::Scalar::ONE, commitment);

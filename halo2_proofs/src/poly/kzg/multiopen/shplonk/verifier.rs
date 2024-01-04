@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::io::Read;
+use std::marker::PhantomData;
 
 use super::ChallengeY;
 use super::{construct_intermediate_sets, ChallengeU, ChallengeV};
@@ -21,6 +22,7 @@ use crate::poly::{
     Error,
 };
 use crate::transcript::{EncodedChallenge, TranscriptRead};
+use crate::ZalRef;
 use ff::{Field, PrimeField};
 use group::Group;
 use halo2curves::pairing::{Engine, MillerLoopResult, MultiMillerLoop};
@@ -29,19 +31,21 @@ use std::ops::MulAssign;
 
 /// Concrete KZG multiopen verifier with SHPLONK variant
 #[derive(Debug)]
-pub struct VerifierSHPLONK<'params, E: Engine> {
+pub struct VerifierSHPLONK<'params, 'zal, E: Engine> {
     params: &'params ParamsKZG<E>,
+    //zal: PhantomData<ZalRef<'zal>>,
 }
 
-impl<'params, E> Verifier<'params, KZGCommitmentScheme<E>> for VerifierSHPLONK<'params, E>
+impl<'params, 'zal, E> Verifier<'params, 'zal, KZGCommitmentScheme<E>>
+    for VerifierSHPLONK<'params, 'zal, E>
 where
     E: MultiMillerLoop + Debug,
     E::Scalar: PrimeField + Ord,
     E::G1Affine: SerdeCurveAffine,
     E::G2Affine: SerdeCurveAffine,
 {
-    type Guard = GuardKZG<'params, E>;
-    type MSMAccumulator = DualMSM<'params, E>;
+    type Guard = GuardKZG<'params, 'zal, E>;
+    type MSMAccumulator = DualMSM<'params, 'zal, E>;
 
     const QUERY_INSTANCE: bool = false;
 
@@ -52,17 +56,20 @@ where
     /// Verify a multi-opening proof
     fn verify_proof<
         'com,
+        //'zal: 'com,
         Ch: EncodedChallenge<E::G1Affine>,
         T: TranscriptRead<E::G1Affine, Ch>,
         I,
     >(
         &self,
+        zal: ZalRef,
         transcript: &mut T,
         queries: I,
-        mut msm_accumulator: DualMSM<'params, E>,
+        mut msm_accumulator: DualMSM<'params, 'zal, E>,
     ) -> Result<Self::Guard, Error>
     where
-        I: IntoIterator<Item = VerifierQuery<'com, E::G1Affine, MSMKZG<E>>> + Clone,
+        'zal: 'com,
+        I: IntoIterator<Item = VerifierQuery<'com, E::G1Affine, MSMKZG<'zal, E>>> + Clone,
     {
         let intermediate_sets = construct_intermediate_sets(queries);
         let (rotation_sets, super_point_set) = (
@@ -109,7 +116,7 @@ where
                     let r_eval = power_of_y * eval_polynomial(&r_x[..], *u);
                     let msm = match commitment_data.get() {
                         CommitmentReference::Commitment(c) => {
-                            let mut msm = MSMKZG::<E>::new();
+                            let mut msm = MSMKZG::<E>::new(zal);
                             msm.append_term(power_of_y, (*c).into());
                             msm
                         }

@@ -15,7 +15,7 @@ pub trait Guard<Scheme: CommitmentScheme> {
 }
 
 /// Trait representing a strategy for verifying Halo 2 proofs.
-pub trait VerificationStrategy<'params, Scheme: CommitmentScheme, V: Verifier<'params, Scheme>> {
+pub trait VerificationStrategy<'params, 'zal, Scheme: CommitmentScheme, V: Verifier<'params, 'zal, Scheme>> {
     /// The output type of this verification strategy after processing a proof.
     type Output;
 

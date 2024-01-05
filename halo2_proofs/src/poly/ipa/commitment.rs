@@ -41,7 +41,7 @@ pub struct IPACommitmentScheme<C: CurveAffine> {
     _marker: PhantomData<C>,
 }
 
-impl<C: CurveAffine> CommitmentScheme for IPACommitmentScheme<C> {
+impl<'params, 'zal, C: CurveAffine> CommitmentScheme for IPACommitmentScheme<C> {
     type Scalar = C::ScalarExt;
     type Curve = C;
 

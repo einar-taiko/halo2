@@ -25,7 +25,10 @@ where
     other: BTreeMap<C::Base, (C::Scalar, C::Base)>,
 }
 
-impl<'params, 'zal, C: CurveAffine> MSMIPA<'params, 'zal, C> {
+impl<'params, 'zal, C: CurveAffine> MSMIPA<'params, 'zal, C>
+where
+    'zal: 'params,
+{
     /// Given verifier parameters Creates an empty multi scalar engine
     pub fn new(params: &'params ParamsVerifierIPA<C>, zal: ZalRef<'zal>) -> Self {
         let g_scalars = None;
